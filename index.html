@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Composting Facility Locator — find drop-off & processing sites near you</title>
+<meta name="description" content="A national, filterable map of composting facilities across the US. Find drop-off sites, commercial processors, haulers, and municipal programs near you.">
+<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
+<style>
+html,body{margin:0}
+#ee-locator-wrapper { position: relative; width: 100%; height: 100dvh; font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; color:#212121; }
+#ee-locator-wrapper * { box-sizing: border-box; }
+#ee-locator-wrapper #ee-map { position:absolute; inset:0; }
+#ee-locator-wrapper .ee-hidden { display:none !important; }
+#ee-locator-wrapper .ee-topbar { position:absolute; top:12px; left:12px; right:12px; display:flex; gap:8px; flex-wrap:wrap; z-index:5; }
+#ee-locator-wrapper .ee-toggle { display:flex; background:#fff; border-radius:24px; padding:4px; box-shadow:0 2px 8px rgba(0,0,0,.15); }
+#ee-locator-wrapper .ee-toggle button { border:0; background:none; padding:8px 14px; border-radius:20px; font-size:13px; font-weight:600; cursor:pointer; color:#006837; }
+#ee-locator-wrapper .ee-toggle button.active { background:#006837; color:#fff; }
+#ee-locator-wrapper .ee-search { display:flex; gap:6px; background:#fff; border-radius:10px; padding:6px; box-shadow:0 2px 8px rgba(0,0,0,.15); }
+#ee-locator-wrapper .ee-search input { border:1px solid #e0e0e0; border-radius:7px; padding:8px 10px; font-size:14px; min-width:170px; }
+#ee-locator-wrapper .ee-search button { border:0; background:#00a94f; color:#fff; border-radius:7px; padding:8px 14px; font-weight:600; cursor:pointer; }
+#ee-locator-wrapper .ee-chips { position:absolute; top:64px; left:12px; right:364px; display:flex; gap:6px; flex-wrap:wrap; z-index:4; }
+#ee-locator-wrapper .ee-chip { border:2px solid #00a94f; background:#fff; color:#006837; border-radius:16px; padding:4px 10px; font-size:12px; font-weight:500; cursor:pointer; }
+#ee-locator-wrapper .ee-chip.active { background:#00a94f; color:#fff; }
+#ee-locator-wrapper .ee-results { position:absolute; top:12px; right:12px; width:340px; max-height:calc(100dvh - 24px); background:#fff; border-radius:12px; box-shadow:0 2px 12px rgba(0,0,0,.18); overflow:hidden; display:flex; flex-direction:column; z-index:6; }
+#ee-locator-wrapper .ee-results-handle { display:none; }
+#ee-locator-wrapper .ee-results-count { padding:10px 14px; font-weight:700; color:#006837; border-bottom:1px solid #eee; }
+#ee-locator-wrapper .ee-results-list { overflow-y:auto; }
+#ee-locator-wrapper .ee-card { padding:10px 14px; border-bottom:1px solid #f0f0f0; cursor:pointer; }
+#ee-locator-wrapper .ee-card:hover { background:#f1f8e9; }
+#ee-locator-wrapper .ee-card h4 { margin:3px 0; font-size:14px; color:#006837; }
+#ee-locator-wrapper .ee-card .ee-sub { font-size:12px; color:#777; }
+#ee-locator-wrapper .ee-badge { display:inline-block; background:#f1cd14; color:#006837; font-size:11px; font-weight:700; padding:1px 7px; border-radius:10px; margin-right:4px; }
+#ee-locator-wrapper .ee-badge-sta { background:#e8f5e9; color:#006837; border:1px solid #00a94f; }
+#ee-locator-wrapper .ee-dist { margin-left:6px; color:#999; }
+#ee-locator-wrapper .ee-detail { position:absolute; left:12px; bottom:12px; width:320px; background:#fff; border-radius:12px; box-shadow:0 2px 12px rgba(0,0,0,.2); padding:14px; z-index:7; }
+#ee-locator-wrapper .ee-detail h3 { margin:6px 0; color:#006837; }
+#ee-locator-wrapper .ee-detail p { margin:3px 0; font-size:13px; }
+#ee-locator-wrapper .ee-detail button { margin-top:8px; border:0; background:#eee; border-radius:7px; padding:6px 12px; cursor:pointer; }
+#ee-locator-wrapper .ee-gate-modal { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.5); z-index:20; }
+#ee-locator-wrapper .ee-gate-card { background:#fff; border-radius:12px; padding:24px; max-width:400px; width:92%; }
+#ee-locator-wrapper .ee-gate-card h3 { margin:0 0 6px; color:#006837; }
+#ee-locator-wrapper .ee-gate-card p { margin:0 0 14px; font-size:14px; color:#444; }
+#ee-locator-wrapper .ee-lead { display:flex; gap:8px; margin-bottom:12px; }
+#ee-locator-wrapper .ee-lead button { flex:1; border:2px solid #00a94f; background:#fff; color:#006837; border-radius:8px; padding:8px; font-size:12px; font-weight:600; cursor:pointer; }
+#ee-locator-wrapper .ee-lead button.active { background:#00a94f; color:#fff; }
+#ee-locator-wrapper .ee-gate-card input { width:100%; border:2px solid #e0e0e0; border-radius:8px; padding:10px; font-size:14px; margin-bottom:8px; }
+#ee-locator-wrapper #ee-gate-submit { width:100%; border:0; background:#00a94f; color:#fff; border-radius:8px; padding:12px; font-weight:700; cursor:pointer; }
+#ee-locator-wrapper .ee-gate-error { color:#c62828; font-size:13px; min-height:18px; }
+@media (max-width:768px){
+  #ee-locator-wrapper .ee-chips { right:12px; top:112px; }
+  #ee-locator-wrapper .ee-results { top:auto; bottom:0; left:0; right:0; width:100%; border-radius:14px 14px 0 0; transition:height .2s ease; }
+  #ee-locator-wrapper .ee-results[data-snap="peek"]{ height:24%; }
+  #ee-locator-wrapper .ee-results[data-snap="half"]{ height:50%; }
+  #ee-locator-wrapper .ee-results[data-snap="full"]{ height:88%; }
+  #ee-locator-wrapper .ee-results-handle { display:block; width:36px; height:4px; background:#ccc; border-radius:3px; margin:8px auto; cursor:grab; touch-action:none; }
+  #ee-locator-wrapper .ee-detail { width:auto; left:12px; right:12px; bottom:26%; }
+}
+</style>
+</head>
+<body>
+<div id="ee-locator-wrapper">
+  <div id="ee-map"></div>
+  <div class="ee-topbar">
+    <div class="ee-toggle" id="ee-toggle">
+      <button data-view="operator" class="active">🍽️ Operator</button>
+      <button data-view="student">🎓 Student</button>
+    </div>
+    <div class="ee-search">
+      <input id="ee-search-input" type="text" placeholder="ZIP or city, state">
+      <button id="ee-search-btn">Search</button>
+    </div>
+  </div>
+  <div class="ee-chips" id="ee-chips"></div>
+  <div class="ee-results" id="ee-results" data-snap="half">
+    <div class="ee-results-handle" id="ee-results-handle"></div>
+    <div class="ee-results-count" id="ee-results-count">Loading…</div>
+    <div class="ee-results-list" id="ee-results-list"></div>
+  </div>
+  <div class="ee-detail ee-hidden" id="ee-detail"></div>
+  <div class="ee-gate-modal ee-hidden" id="ee-gate-modal">
+    <div class="ee-gate-card">
+      <h3>See the facilities near you</h3>
+      <p>Tell us who you are and drop your email — we'll show the details and keep you posted.</p>
+      <div class="ee-lead">
+        <button data-lead="operator">🍽️ I run foodservice</button>
+        <button data-lead="student">🎓 I'm a student</button>
+      </div>
+      <input id="ee-gate-email" type="email" autocomplete="email" inputmode="email" placeholder="you@company.com">
+      <div class="ee-gate-error" id="ee-gate-error"></div>
+      <button id="ee-gate-submit">Show me</button>
+    </div>
+  </div>
+</div>
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="./location-data.js"></script>
+<script src="./app.js"></script>
+</body>
+</html>
