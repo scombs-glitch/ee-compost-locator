@@ -31,8 +31,8 @@
   // AND-across-group semantics, hide every facility lacking the verified badge and empty
   // the map until first-party verification scales.
   var TOGGLE_PRESETS = {
-    operator: ['commercial_facility', 'hauler'],
-    student:  ['drop_off', 'municipality', 'food_scraps']
+    commercial:  ['commercial_facility', 'hauler'],
+    residential: ['drop_off', 'municipality']
   };
 
   var GATE = {
@@ -45,9 +45,12 @@
     maplibreVersion: '4.7.1',
     baseStyleUrl: 'https://tiles.openfreemap.org/styles/positron',
     initialCenter: [-96.5, 38.5], // [lng, lat]
-    initialZoom: 3.6,
-    // Contiguous US [ [west,south], [east,north] ] — the map opens fit to this, not all of North America.
+    initialZoom: 4,
+    // Contiguous US [ [west,south], [east,north] ] — the map opens fit to this, not all of North
+    // America. minZoom stops zoom-out to the whole hemisphere. No maxBounds on purpose: AK/HI/PR/GU
+    // are US and must stay reachable, and no rectangle includes Alaska while excluding Canada.
     usBounds: [[-125, 24.5], [-66.9, 49.4]],
+    minZoom: 3,
     clusterRadius: 50,
     clusterMaxZoom: 12
   };
@@ -169,7 +172,7 @@
 
   function buildPayload(o) {
     if (!isValidEmail(o.email)) throw new Error('invalid email');
-    if (o.leadType !== 'operator' && o.leadType !== 'student') throw new Error('lead_type required');
+    if (o.leadType !== 'commercial' && o.leadType !== 'residential') throw new Error('lead_type required');
     return {
       email: o.email.trim(), lead_type: o.leadType, zip: o.zip || '',
       timestamp: new Date(o.now).toISOString(), userAgent: o.userAgent || '',
@@ -181,7 +184,7 @@
   // Returns Promise<{granted, captured, eventId, error?}>. Always granted unless validation fails.
   function submit(deps, o) {
     if (!isValidEmail(o.email)) return Promise.resolve({ granted: false, captured: false, error: 'invalid email' });
-    if (o.leadType !== 'operator' && o.leadType !== 'student') return Promise.resolve({ granted: false, captured: false, error: 'lead_type required' });
+    if (o.leadType !== 'commercial' && o.leadType !== 'residential') return Promise.resolve({ granted: false, captured: false, error: 'lead_type required' });
     var eventId = newEventId(deps.rng);
     var payload = buildPayload({ email: o.email, leadType: o.leadType, zip: o.zip, now: o.now, userAgent: o.userAgent, eventId: eventId });
     var url = (deps.appsScriptUrl != null) ? deps.appsScriptUrl : cfg.GATE.appsScriptUrl;
@@ -250,7 +253,7 @@
     var cfg = opts.cfg, filters = opts.filters, gate = opts.gate, ML = root.maplibregl;
     var records = opts.data.slice();
     var byId = {}; records.forEach(function (r) { byId[r.id] = r; });
-    var state = { view: 'operator', userToggled: {}, sessionGranted: false, center: null, pending: null };
+    var state = { view: 'commercial', userToggled: {}, sessionGranted: false, center: null, pending: null };
 
     function activeIds() { return filters.activeChipIds(state.view, state.userToggled); }
     function filtered() { var a = activeIds(); return records.filter(function (r) { return filters.recordPasses(r, a); }); }
@@ -259,7 +262,8 @@
     try {
       map = new ML.Map({
         container: 'ee-map', style: cfg.MAP.baseStyleUrl,
-        center: cfg.MAP.initialCenter, zoom: cfg.MAP.initialZoom
+        center: cfg.MAP.initialCenter, zoom: cfg.MAP.initialZoom,
+        minZoom: cfg.MAP.minZoom
       });
     } catch (e) {
       // Map/WebGL unavailable in this environment — list, filters, search and gate still work.
