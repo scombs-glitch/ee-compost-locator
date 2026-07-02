@@ -299,7 +299,8 @@
       });
       map.addLayer({
         id: 'cluster-count', type: 'symbol', source: 'locs', filter: ['has', 'point_count'],
-        layout: { 'text-field': ['get', 'point_count_abbreviated'], 'text-size': 12 },
+        // text-font must be one the tile server hosts — MapLibre's default (Open Sans) 404s on OpenFreeMap
+        layout: { 'text-field': ['get', 'point_count_abbreviated'], 'text-size': 12, 'text-font': ['Noto Sans Bold'] },
         paint: { 'text-color': '#ffffff' }
       });
       map.addLayer({
