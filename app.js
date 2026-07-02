@@ -90,6 +90,13 @@
     filters = filters || cfg.FILTERS;
     var byGroup = groupActive(activeIds, filters);
     return Object.keys(byGroup).every(function (g) {
+      // Materials are reported for only ~1/3 of facilities. A blank acceptedMaterials means
+      // "unknown", not "rejects" — keep such facilities visible under any materials filter so a
+      // click never silently hides two-thirds of the map (they're labeled in the UI).
+      if (g === 'material') {
+        var am = record.acceptedMaterials;
+        if (!am || am.length === 0) return true;
+      }
       return byGroup[g].some(function (c) { return matchesChip(record, c); });
     });
   }
@@ -254,7 +261,7 @@
     var cfg = opts.cfg, filters = opts.filters, gate = opts.gate, ML = root.maplibregl;
     var records = opts.data.slice();
     var byId = {}; records.forEach(function (r) { byId[r.id] = r; });
-    var state = { view: 'commercial', userToggled: {}, sessionGranted: false, center: null, pending: null };
+    var state = { view: 'all', userToggled: {}, sessionGranted: false, center: null, pending: null };
 
     function activeIds() { return filters.activeChipIds(state.view, state.userToggled); }
     function filtered() { var a = activeIds(); return records.filter(function (r) { return filters.recordPasses(r, a); }); }
@@ -320,7 +327,9 @@
       b.addEventListener('click', function () {
         state.view = b.getAttribute('data-view');
         state.userToggled = {};
-        Array.prototype.forEach.call(opts.root.querySelectorAll('#ee-toggle button'), function (x) { x.classList.toggle('active', x === b); });
+        Array.prototype.forEach.call(opts.root.querySelectorAll('#ee-toggle button'), function (x) {
+          var on = x === b; x.classList.toggle('active', on); x.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
         renderChips(); refreshData(); renderResults();
       });
     });
@@ -358,7 +367,9 @@
         var isActive = active.indexOf(c.id) !== -1;
         var cnt = facetCount(c, active);               // results if this chip is applied now
         var chip = document.createElement('button');
+        chip.type = 'button';
         chip.className = 'ee-chip' + (isActive ? ' active' : '') + ((cnt === 0 && !isActive) ? ' ee-chip-empty' : '');
+        chip.setAttribute('aria-pressed', isActive ? 'true' : 'false');
         chip.textContent = c.label + ' (' + cnt + ')';
         if (cnt === 0 && !isActive) { chip.disabled = true; host.appendChild(chip); return; }
         chip.addEventListener('click', function () {
@@ -371,20 +382,34 @@
     }
 
     // ---- results list / bottom sheet ----
+    function materialActive() {
+      return activeIds().some(function (id) {
+        var f = cfg.FILTERS.find(function (x) { return x.id === id; });
+        return f && f.group === 'material';
+      });
+    }
     function renderResults() {
       var list = filtered();
-      var within = false;
+      var within = false, nearest = false;
       if (state.center) {
         list.forEach(function (r) { r._d = distMiles(state.center.lat, state.center.lng, r.lat, r.lng); });
         list.sort(function (a, b) { return a._d - b._d; });
         var near = list.filter(function (r) { return r._d <= 60; });
-        list = near.length ? near : list.slice(0, 20);
-        within = true;
+        if (near.length) { list = near; within = true; } else { list = list.slice(0, 20); nearest = true; }
       }
-      el('ee-results-count').textContent = list.length + ' location' + (list.length !== 1 ? 's' : '') + (within ? ' within 60 mi' : '');
+      var total = list.length;
+      var label = nearest
+        ? 'nearest ' + total + ' location' + (total !== 1 ? 's' : '')
+        : total + ' location' + (total !== 1 ? 's' : '') + (within ? ' within 60 mi' : '');
+      // materials are sparsely reported → be honest about confirmed vs unreported when filtering
+      if (materialActive()) {
+        var confirmed = list.filter(function (r) { return (r.acceptedMaterials || []).length; }).length;
+        label += ' · ' + confirmed + ' confirmed, rest unreported';
+      }
+      el('ee-results-count').textContent = label;
       var host = el('ee-results-list'); host.innerHTML = '';
       list.slice(0, 100).forEach(function (r) {
-        var card = document.createElement('div'); card.className = 'ee-card';
+        var card = document.createElement('button'); card.type = 'button'; card.className = 'ee-card';
         var ee = r.acceptsEE === 'verified' ? '<span class="ee-badge">Accepts EE ✓</span>' : '';
         var dist = (r._d != null) ? '<span class="ee-dist">' + r._d.toFixed(1) + ' mi</span>' : '';
         card.innerHTML = ee + '<h4>' + r.name + '</h4><div class="ee-sub">' +
@@ -392,11 +417,20 @@
         card.addEventListener('click', function () { openDetail(r); });
         host.appendChild(card);
       });
+      if (total > 100) {
+        var more = document.createElement('div'); more.className = 'ee-more';
+        more.textContent = 'Showing first 100 of ' + total + ' — search or filter to narrow.';
+        host.appendChild(more);
+      }
     }
 
     // ---- facility detail (high-value intent → gate) ----
     function openDetail(r) {
-      if (gate.shouldGate(true, state.sessionGranted, opts.now(), opts.gateDeps.storage)) {
+      // Only interrupt with the email gate if a capture endpoint is actually wired. With no
+      // Apps Script URL the gate captures nothing, so it would be pure friction — skip it.
+      // Setting GATE.appsScriptUrl (and rebuilding) auto-activates the gate.
+      var captureUrl = (opts.gateDeps.appsScriptUrl != null) ? opts.gateDeps.appsScriptUrl : (cfg.GATE && cfg.GATE.appsScriptUrl);
+      if (captureUrl && gate.shouldGate(true, state.sessionGranted, opts.now(), opts.gateDeps.storage)) {
         state.pending = function () { showDetail(r); };
         showGate();
         return;
@@ -409,26 +443,55 @@
       var ee = r.acceptsEE === 'verified' ? '<span class="ee-badge">Accepts EE ✓</span>' : '';
       var sta = r.staCertified ? '<span class="ee-badge ee-badge-sta">STA Certified</span>' : '';
       var staLink = r.staCertified ? '<p><a href="' + (r.staUrl || cfg.LINKS.staDirectory) + '" target="_blank" rel="noopener">STA test results &amp; details ↗</a></p>' : '';
+      var site = r.website ? (/^https?:\/\//i.test(r.website) ? r.website : 'https://' + r.website) : '';
+      var mats = (r.acceptedMaterials && r.acceptedMaterials.length)
+        ? ' · accepts ' + r.acceptedMaterials.join(', ').replace(/_/g, ' ')
+        : ' · materials not reported';
       box.innerHTML = ee + sta + '<h3>' + r.name + '</h3>' +
         '<p>' + [r.address, r.city, r.state, r.zip].filter(Boolean).join(', ') + '</p>' +
         (r.phone ? '<p>' + r.phone + '</p>' : '') +
-        (r.website ? '<p><a href="' + r.website + '" target="_blank" rel="noopener">Website</a></p>' : '') +
-        '<p class="ee-sub">' + placeLabel(cfg, r.type) + (r.acceptedMaterials.length ? ' · accepts ' + r.acceptedMaterials.join(', ') : '') + '</p>' +
+        (site ? '<p><a href="' + site + '" target="_blank" rel="noopener">Website</a></p>' : '') +
+        '<p class="ee-sub">' + placeLabel(cfg, r.type) + mats + '</p>' +
         staLink +
-        '<button id="ee-detail-close">Close</button>';
+        '<p class="ee-note">Type &amp; materials are derived from public records and may be out of date — confirm acceptance directly with the facility.</p>' +
+        '<button id="ee-detail-close" type="button">Close</button>';
       box.classList.remove('ee-hidden');
       el('ee-detail-close').addEventListener('click', function () { box.classList.add('ee-hidden'); });
     }
 
     // ---- gate modal ----
-    function showGate() { el('ee-gate-modal').classList.remove('ee-hidden'); }
-    function hideGate() { el('ee-gate-modal').classList.add('ee-hidden'); }
+    var gateReturnFocus = null;
+    function showGate() {
+      gateReturnFocus = document.activeElement;
+      el('ee-gate-modal').classList.remove('ee-hidden');
+      var email = el('ee-gate-email'); if (email) email.focus();
+    }
+    function hideGate() {
+      el('ee-gate-modal').classList.add('ee-hidden');
+      state.pending = null;
+      if (gateReturnFocus && gateReturnFocus.focus) { try { gateReturnFocus.focus(); } catch (e) {} }
+    }
     (function wireGate() {
       var choice = null;
+      var modal = el('ee-gate-modal');
+      var closeBtn = el('ee-gate-close'); if (closeBtn) closeBtn.addEventListener('click', hideGate);
+      modal.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') { hideGate(); return; }
+        if (e.key !== 'Tab') return;
+        var f = Array.prototype.filter.call(
+          modal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'),
+          function (x) { return !x.disabled && x.offsetParent !== null; });
+        if (!f.length) return;
+        var first = f[0], last = f[f.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      });
       Array.prototype.forEach.call(opts.root.querySelectorAll('#ee-gate-modal [data-lead]'), function (b) {
         b.addEventListener('click', function () {
           choice = b.getAttribute('data-lead');
-          Array.prototype.forEach.call(opts.root.querySelectorAll('#ee-gate-modal [data-lead]'), function (x) { x.classList.toggle('active', x === b); });
+          Array.prototype.forEach.call(opts.root.querySelectorAll('#ee-gate-modal [data-lead]'), function (x) {
+            var on = x === b; x.classList.toggle('active', on); x.setAttribute('aria-pressed', on ? 'true' : 'false');
+          });
         });
       });
       el('ee-gate-submit').addEventListener('click', function () {
@@ -450,19 +513,34 @@
       });
     })();
 
-    // ---- search (runtime geocode, allowed) ----
+    // ---- search (runtime geocode — US only, via Zippopotam: free, CORS *, no key) ----
     el('ee-search-btn').addEventListener('click', doSearch);
     el('ee-search-input').addEventListener('keydown', function (e) { if (e.key === 'Enter') doSearch(); });
+    function geocodeUS(q) {
+      var zip = q.match(/^\s*(\d{5})\s*$/), url;
+      if (zip) {
+        url = 'https://api.zippopotam.us/us/' + zip[1];
+      } else {
+        var parts = q.split(','), city = parts[0].trim(), st = parts[parts.length - 1].trim();
+        if (parts.length < 2 || !city || !/^[A-Za-z]{2}$/.test(st)) return Promise.resolve(null);
+        url = 'https://api.zippopotam.us/us/' + st.toLowerCase() + '/' + encodeURIComponent(city);
+      }
+      return fetch(url).then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
+        var ps = d && d.places; if (!ps || !ps.length) return null;
+        var lat = 0, lng = 0;
+        ps.forEach(function (p) { lat += parseFloat(p.latitude); lng += parseFloat(p.longitude); });
+        return { lat: lat / ps.length, lng: lng / ps.length };
+      });
+    }
     function doSearch() {
       var q = el('ee-search-input').value.trim(); if (!q) return;
-      fetch('https://nominatim.openstreetmap.org/search?format=json&countrycodes=us&limit=1&q=' + encodeURIComponent(q))
-        .then(function (r) { return r.json(); })
-        .then(function (d) {
-          if (!d || !d.length) { window.alert('Location not found. Try a ZIP or city, state.'); return; }
-          state.center = { lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon), q: q };
-          if (map) map.flyTo({ center: [state.center.lng, state.center.lat], zoom: 9 });
-          renderResults();
-        }).catch(function () {});
+      var countEl = el('ee-results-count'); countEl.textContent = 'Searching…';
+      geocodeUS(q).then(function (pt) {
+        if (!pt) { countEl.textContent = 'Couldn’t find “' + q + '” — try a 5-digit ZIP or City, ST.'; return; }
+        state.center = { lat: pt.lat, lng: pt.lng, q: q };
+        if (map) map.flyTo({ center: [pt.lng, pt.lat], zoom: 9 });
+        renderResults();
+      }).catch(function () { countEl.textContent = 'Search is unavailable right now — please try again.'; });
     }
 
     // ---- mobile bottom-sheet drag (3 snap points) ----
@@ -480,6 +558,7 @@
 
     renderChips();
     renderResults();
+    var ac = el('ee-attrib-count'); if (ac) ac.textContent = records.length.toLocaleString() + ' facilities mapped';
     return { refreshData: refreshData, _state: state };
   }
 
@@ -492,7 +571,10 @@
   'use strict';
   function start() {
     var EE = root.EE;
-    if (!EE || !root.maplibregl || !EE.mapview) return;
+    // Only require our own modules to boot. maplibregl is optional — mapview.init() wraps the
+    // map in try/catch and every map call is guarded, so the list/filters/search/gate still
+    // work if the map CDN or WebGL fails. (Requiring maplibregl here would kill the whole app.)
+    if (!EE || !EE.mapview) return;
     var gateDeps = {
       fetch: root.fetch.bind(root),
       storage: root.localStorage,

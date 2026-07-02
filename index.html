@@ -4,10 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Composting Facility Locator — find drop-off & processing sites near you</title>
-<meta name="description" content="A national, filterable map of composting facilities across the US. Find drop-off sites, commercial processors, haulers, and municipal programs near you.">
+<meta name="description" content="A national, filterable map of 5,000+ US composting facilities. Find drop-off sites, commercial processors, haulers, and municipal programs near you.">
 <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
 <style>
 html,body{margin:0}
+/* All selectors scoped under #ee-locator-wrapper so theme CSS can't leak in or out. */
 #ee-locator-wrapper { position: relative; width: 100%; height: 100dvh; font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; color:#212121; }
 #ee-locator-wrapper * { box-sizing: border-box; }
 #ee-locator-wrapper #ee-map { position:absolute; inset:0; }
@@ -18,35 +19,42 @@ html,body{margin:0}
 #ee-locator-wrapper .ee-toggle button.active { background:#006837; color:#fff; }
 #ee-locator-wrapper .ee-search { display:flex; gap:6px; background:#fff; border-radius:10px; padding:6px; box-shadow:0 2px 8px rgba(0,0,0,.15); }
 #ee-locator-wrapper .ee-search input { border:1px solid #e0e0e0; border-radius:7px; padding:8px 10px; font-size:14px; min-width:170px; }
-#ee-locator-wrapper .ee-search button { border:0; background:#00a94f; color:#fff; border-radius:7px; padding:8px 14px; font-weight:600; cursor:pointer; }
+#ee-locator-wrapper .ee-search button { border:0; background:#006837; color:#fff; border-radius:7px; padding:8px 14px; font-weight:600; cursor:pointer; }
 #ee-locator-wrapper .ee-chips { position:absolute; top:64px; left:12px; right:364px; display:flex; gap:6px; flex-wrap:wrap; z-index:4; }
-#ee-locator-wrapper .ee-chip { border:2px solid #00a94f; background:#fff; color:#006837; border-radius:16px; padding:4px 10px; font-size:12px; font-weight:500; cursor:pointer; }
-#ee-locator-wrapper .ee-chip.active { background:#00a94f; color:#fff; }
+#ee-locator-wrapper .ee-chip { border:2px solid #00a94f; background:#fff; color:#006837; border-radius:16px; padding:5px 11px; font-size:12px; font-weight:500; cursor:pointer; }
+#ee-locator-wrapper .ee-chip.active { background:#006837; color:#fff; border-color:#006837; }
 #ee-locator-wrapper .ee-chip:disabled, #ee-locator-wrapper .ee-chip.ee-chip-empty { opacity:.4; cursor:not-allowed; }
+#ee-locator-wrapper .ee-chip:focus-visible, #ee-locator-wrapper .ee-card:focus-visible, #ee-locator-wrapper .ee-toggle button:focus-visible, #ee-locator-wrapper .ee-search button:focus-visible, #ee-locator-wrapper .ee-lead button:focus-visible, #ee-locator-wrapper #ee-gate-submit:focus-visible { outline:2px solid #006837; outline-offset:2px; }
 #ee-locator-wrapper .ee-results { position:absolute; top:12px; right:12px; width:340px; max-height:calc(100dvh - 24px); background:#fff; border-radius:12px; box-shadow:0 2px 12px rgba(0,0,0,.18); overflow:hidden; display:flex; flex-direction:column; z-index:6; }
 #ee-locator-wrapper .ee-results-handle { display:none; }
 #ee-locator-wrapper .ee-results-count { padding:10px 14px; font-weight:700; color:#006837; border-bottom:1px solid #eee; }
 #ee-locator-wrapper .ee-results-list { overflow-y:auto; }
-#ee-locator-wrapper .ee-card { padding:10px 14px; border-bottom:1px solid #f0f0f0; cursor:pointer; }
+#ee-locator-wrapper .ee-card { display:block; width:100%; text-align:left; font:inherit; color:inherit; background:none; border:0; border-bottom:1px solid #f0f0f0; padding:10px 14px; cursor:pointer; }
 #ee-locator-wrapper .ee-card:hover { background:#f1f8e9; }
 #ee-locator-wrapper .ee-card h4 { margin:3px 0; font-size:14px; color:#006837; }
 #ee-locator-wrapper .ee-card .ee-sub { font-size:12px; color:#777; }
+#ee-locator-wrapper .ee-more { padding:10px 14px; font-size:12px; color:#767676; }
 #ee-locator-wrapper .ee-badge { display:inline-block; background:#f1cd14; color:#006837; font-size:11px; font-weight:700; padding:1px 7px; border-radius:10px; margin-right:4px; }
 #ee-locator-wrapper .ee-badge-sta { background:#e8f5e9; color:#006837; border:1px solid #00a94f; }
-#ee-locator-wrapper .ee-dist { margin-left:6px; color:#999; }
+#ee-locator-wrapper .ee-dist { margin-left:6px; color:#767676; }
 #ee-locator-wrapper .ee-detail { position:absolute; left:12px; bottom:12px; width:320px; background:#fff; border-radius:12px; box-shadow:0 2px 12px rgba(0,0,0,.2); padding:14px; z-index:7; }
 #ee-locator-wrapper .ee-detail h3 { margin:6px 0; color:#006837; }
 #ee-locator-wrapper .ee-detail p { margin:3px 0; font-size:13px; }
+#ee-locator-wrapper .ee-note { font-size:11px; color:#767676; font-style:italic; margin-top:6px; }
 #ee-locator-wrapper .ee-detail button { margin-top:8px; border:0; background:#eee; border-radius:7px; padding:6px 12px; cursor:pointer; }
+#ee-locator-wrapper .ee-attrib { position:absolute; bottom:4px; left:8px; z-index:3; font-size:10px; line-height:1.3; color:#555; background:rgba(255,255,255,.82); padding:2px 6px; border-radius:4px; max-width:52%; }
+#ee-locator-wrapper .ee-attrib a { color:#006837; }
 #ee-locator-wrapper .ee-gate-modal { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.5); z-index:20; }
-#ee-locator-wrapper .ee-gate-card { background:#fff; border-radius:12px; padding:24px; max-width:400px; width:92%; }
-#ee-locator-wrapper .ee-gate-card h3 { margin:0 0 6px; color:#006837; }
+#ee-locator-wrapper .ee-gate-card { position:relative; background:#fff; border-radius:12px; padding:24px; max-width:400px; width:92%; }
+#ee-locator-wrapper .ee-gate-close { position:absolute; top:8px; right:12px; border:0; background:none; font-size:24px; line-height:1; color:#777; cursor:pointer; }
+#ee-locator-wrapper .ee-gate-card h3 { margin:0 18px 6px 0; color:#006837; }
 #ee-locator-wrapper .ee-gate-card p { margin:0 0 14px; font-size:14px; color:#444; }
 #ee-locator-wrapper .ee-lead { display:flex; gap:8px; margin-bottom:12px; }
 #ee-locator-wrapper .ee-lead button { flex:1; border:2px solid #00a94f; background:#fff; color:#006837; border-radius:8px; padding:8px; font-size:12px; font-weight:600; cursor:pointer; }
-#ee-locator-wrapper .ee-lead button.active { background:#00a94f; color:#fff; }
+#ee-locator-wrapper .ee-lead button.active { background:#006837; color:#fff; border-color:#006837; }
 #ee-locator-wrapper .ee-gate-card input { width:100%; border:2px solid #e0e0e0; border-radius:8px; padding:10px; font-size:14px; margin-bottom:8px; }
-#ee-locator-wrapper #ee-gate-submit { width:100%; border:0; background:#00a94f; color:#fff; border-radius:8px; padding:12px; font-weight:700; cursor:pointer; }
+#ee-locator-wrapper #ee-gate-submit { width:100%; border:0; background:#006837; color:#fff; border-radius:8px; padding:12px; font-weight:700; cursor:pointer; }
+#ee-locator-wrapper .ee-gate-privacy { font-size:11px; color:#767676; margin:10px 0 0; text-align:center; }
 #ee-locator-wrapper .ee-gate-error { color:#c62828; font-size:13px; min-height:18px; }
 @media (max-width:768px){
   #ee-locator-wrapper .ee-chips { right:12px; top:112px; }
@@ -63,33 +71,37 @@ html,body{margin:0}
 <div id="ee-locator-wrapper">
   <div id="ee-map"></div>
   <div class="ee-topbar">
-    <div class="ee-toggle" id="ee-toggle">
-      <button data-view="commercial" class="active">🏢 Commercial</button>
-      <button data-view="residential">🏠 Residential</button>
+    <div class="ee-toggle" id="ee-toggle" role="group" aria-label="Audience filter">
+      <button type="button" data-view="all" class="active" aria-pressed="true">🗺️ All</button>
+      <button type="button" data-view="commercial" aria-pressed="false">🏢 Commercial</button>
+      <button type="button" data-view="residential" aria-pressed="false">🏠 Residential</button>
     </div>
     <div class="ee-search">
-      <input id="ee-search-input" type="text" placeholder="ZIP or city, state">
-      <button id="ee-search-btn">Search</button>
+      <input id="ee-search-input" type="text" placeholder="ZIP or city, ST" aria-label="Search by ZIP or city, state">
+      <button type="button" id="ee-search-btn">Search</button>
     </div>
   </div>
   <div class="ee-chips" id="ee-chips"></div>
   <div class="ee-results" id="ee-results" data-snap="half">
     <div class="ee-results-handle" id="ee-results-handle"></div>
-    <div class="ee-results-count" id="ee-results-count">Loading…</div>
-    <div class="ee-results-list" id="ee-results-list"></div>
+    <div class="ee-results-count" id="ee-results-count" aria-live="polite">Loading…</div>
+    <div class="ee-results-list" id="ee-results-list" role="list"></div>
   </div>
   <div class="ee-detail ee-hidden" id="ee-detail"></div>
-  <div class="ee-gate-modal ee-hidden" id="ee-gate-modal">
+  <div class="ee-attrib">Data: <a href="https://www.epa.gov/sustainable-management-food/excess-food-opportunities-map" target="_blank" rel="noopener">EPA Excess Food Opportunities Map</a> (v3.1) + NY state open data · STA status via US Composting Council · <span id="ee-attrib-count"></span></div>
+  <div class="ee-gate-modal ee-hidden" id="ee-gate-modal" role="dialog" aria-modal="true" aria-labelledby="ee-gate-title">
     <div class="ee-gate-card">
-      <h3>See the facilities near you</h3>
+      <button type="button" id="ee-gate-close" class="ee-gate-close" aria-label="Close">×</button>
+      <h3 id="ee-gate-title">See the facilities near you</h3>
       <p>Tell us who you are and drop your email — we'll show the details and keep you posted.</p>
       <div class="ee-lead">
-        <button data-lead="commercial">🏢 I run a business</button>
-        <button data-lead="residential">🏠 I'm a resident</button>
+        <button type="button" data-lead="commercial" aria-pressed="false">🏢 I run a business</button>
+        <button type="button" data-lead="residential" aria-pressed="false">🏠 I'm a resident</button>
       </div>
-      <input id="ee-gate-email" type="email" autocomplete="email" inputmode="email" placeholder="you@company.com">
+      <input id="ee-gate-email" type="email" autocomplete="email" inputmode="email" placeholder="you@company.com" aria-label="Your email">
       <div class="ee-gate-error" id="ee-gate-error"></div>
-      <button id="ee-gate-submit">Show me</button>
+      <button type="button" id="ee-gate-submit">Show me</button>
+      <p class="ee-gate-privacy">We'll email you occasional updates. Unsubscribe anytime.</p>
     </div>
   </div>
 </div>
