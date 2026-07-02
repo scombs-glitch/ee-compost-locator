@@ -52,6 +52,9 @@
     // are US and must stay reachable, and no rectangle includes Alaska while excluding Canada.
     usBounds: [[-125, 24.5], [-66.9, 49.4]],
     minZoom: 3,
+    // Page-embedded map: plain scroll scrolls the PAGE; map zoom needs Cmd/Ctrl+scroll
+    // (two fingers on touch). Without this the full-height map traps page scrolling.
+    cooperativeGestures: true,
     clusterRadius: 50,
     clusterMaxZoom: 12
   };
@@ -280,7 +283,8 @@
       map = new ML.Map({
         container: 'ee-map', style: cfg.MAP.baseStyleUrl,
         center: cfg.MAP.initialCenter, zoom: cfg.MAP.initialZoom,
-        minZoom: cfg.MAP.minZoom
+        minZoom: cfg.MAP.minZoom,
+        cooperativeGestures: cfg.MAP.cooperativeGestures
       });
     } catch (e) {
       // Map/WebGL unavailable in this environment — list, filters, search and gate still work.
