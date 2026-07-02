@@ -578,10 +578,24 @@
     var gateDeps = {
       fetch: root.fetch.bind(root),
       storage: root.localStorage,
-      consent: function () { return true; }, // dev: assume consent; production hook = cookie banner
+      // Marketing-pixel consent. A cookie banner can set window.EE_MARKETING_CONSENT to
+      // true/false; until it does, defaults to true (the Lead event only fires AFTER a visitor
+      // voluntarily submits their email — an affirmative action). Wire it before EU traffic.
+      consent: function () {
+        return (typeof root.EE_MARKETING_CONSENT === 'undefined') ? true : !!root.EE_MARKETING_CONSENT;
+      },
       trackers: {
+        // Fires only on a captured lead, with consent. event_id lets Meta CAPI dedup later.
+        // Base pixels (fbq init / lintrk) are page-level tags — see deploy/tracking.md.
         fireLead: function (eventId, leadType) {
-          if (typeof root.fbq === 'function') root.fbq('track', 'Lead', { lead_type: leadType }, { eventID: eventId });
+          try {
+            if (typeof root.fbq === 'function') {
+              root.fbq('track', 'Lead', { lead_type: leadType }, { eventID: eventId });
+            }
+            if (typeof root.lintrk === 'function' && root.EE_LI_CONVERSION_ID) {
+              root.lintrk('track', { conversion_id: root.EE_LI_CONVERSION_ID });
+            }
+          } catch (e) { /* trackers must never break the gate */ }
         }
       },
       rng: Math.random
