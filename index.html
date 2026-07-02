@@ -22,6 +22,7 @@ html,body{margin:0}
 #ee-locator-wrapper .ee-chips { position:absolute; top:64px; left:12px; right:364px; display:flex; gap:6px; flex-wrap:wrap; z-index:4; }
 #ee-locator-wrapper .ee-chip { border:2px solid #00a94f; background:#fff; color:#006837; border-radius:16px; padding:4px 10px; font-size:12px; font-weight:500; cursor:pointer; }
 #ee-locator-wrapper .ee-chip.active { background:#00a94f; color:#fff; }
+#ee-locator-wrapper .ee-chip:disabled, #ee-locator-wrapper .ee-chip.ee-chip-empty { opacity:.4; cursor:not-allowed; }
 #ee-locator-wrapper .ee-results { position:absolute; top:12px; right:12px; width:340px; max-height:calc(100dvh - 24px); background:#fff; border-radius:12px; box-shadow:0 2px 12px rgba(0,0,0,.18); overflow:hidden; display:flex; flex-direction:column; z-index:6; }
 #ee-locator-wrapper .ee-results-handle { display:none; }
 #ee-locator-wrapper .ee-results-count { padding:10px 14px; font-weight:700; color:#006837; border-bottom:1px solid #eee; }

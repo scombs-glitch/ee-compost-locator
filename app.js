@@ -17,6 +17,7 @@
     { id: 'municipality',        label: 'Municipality',                    group: 'place', field: 'type', equals: 'municipality' },
     { id: 'anaerobic_digestion', label: 'Anaerobic Digestion',            group: 'place', field: 'type', equals: 'anaerobic_digestion' },
     { id: 'food_scraps',         label: 'Food Scraps',                     group: 'material', field: 'acceptedMaterials', includes: 'food_scraps' },
+    { id: 'yard_waste',          label: 'Yard Waste',                      group: 'material', field: 'acceptedMaterials', includes: 'yard_waste' },
     { id: 'certified_packaging', label: 'Accepts Certified Packaging',     group: 'material', field: 'acceptedMaterials', includes: 'certified_packaging' },
     { id: 'uncoated_fiber',      label: 'Uncoated Fiber',                  group: 'material', field: 'acceptedMaterials', includes: 'uncoated_fiber' },
     { id: 'accepts_ee',          label: 'Accepts EE ✓',               group: 'attribute', field: 'acceptsEE', equals: 'verified' },
@@ -325,13 +326,41 @@
     });
 
     // ---- filter chips ----
+    // How many facilities each chip can EVER match (context-free). Chips with 0 are hidden —
+    // no point showing a filter backed by no data.
+    var backingCount = {};
+    cfg.FILTERS.forEach(function (c) {
+      var n = 0;
+      for (var i = 0; i < records.length; i++) if (filters.matchesChip(records[i], c)) n++;
+      backingCount[c.id] = n;
+    });
+
+    // Faceted count: records matching chip c AND the active chips in OTHER groups (c's own
+    // group is ignored, standard facet semantics). Shows the result size each chip yields so
+    // stacking is visible, and lets us gray out dead-ends before they zero the map.
+    function facetCount(c, active) {
+      var others = active.filter(function (id) {
+        var f = cfg.FILTERS.find(function (x) { return x.id === id; });
+        return f && f.group !== c.group;
+      });
+      var n = 0;
+      for (var i = 0; i < records.length; i++) {
+        if (filters.matchesChip(records[i], c) && filters.recordPasses(records[i], others)) n++;
+      }
+      return n;
+    }
+
     function renderChips() {
       var host = el('ee-chips'); host.innerHTML = '';
       var active = activeIds();
       cfg.FILTERS.forEach(function (c) {
+        if (backingCount[c.id] === 0) return;          // hide filters with no data behind them
+        var isActive = active.indexOf(c.id) !== -1;
+        var cnt = facetCount(c, active);               // results if this chip is applied now
         var chip = document.createElement('button');
-        chip.className = 'ee-chip' + (active.indexOf(c.id) !== -1 ? ' active' : '');
-        chip.textContent = c.label;
+        chip.className = 'ee-chip' + (isActive ? ' active' : '') + ((cnt === 0 && !isActive) ? ' ee-chip-empty' : '');
+        chip.textContent = c.label + ' (' + cnt + ')';
+        if (cnt === 0 && !isActive) { chip.disabled = true; host.appendChild(chip); return; }
         chip.addEventListener('click', function () {
           var on = activeIds().indexOf(c.id) !== -1;
           state.userToggled[c.id] = !on;
