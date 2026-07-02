@@ -259,6 +259,15 @@
   // opts: { root, data, cfg, filters, gate, gateDeps, now }
   function init(opts) {
     var cfg = opts.cfg, filters = opts.filters, gate = opts.gate, ML = root.maplibregl;
+    // Blur-gate styles ship in the bundle (not the embed block) so gating tweaks never
+    // require re-pasting the WordPress Code module.
+    try {
+      var st = document.createElement('style');
+      st.textContent =
+        '#ee-locator-wrapper .ee-results-list.ee-locked .ee-card{filter:blur(5px);pointer-events:none;user-select:none}' +
+        '#ee-locator-wrapper .ee-unlock{display:block;width:calc(100% - 20px);margin:10px;border:0;background:#006837;color:#fff;border-radius:8px;padding:12px;font-weight:700;font-size:14px;cursor:pointer}';
+      document.head.appendChild(st);
+    } catch (e) { /* styling only — never block boot */ }
     var records = opts.data.slice();
     var byId = {}; records.forEach(function (r) { byId[r.id] = r; });
     var state = { view: 'all', userToggled: {}, sessionGranted: false, center: null, pending: null };
@@ -389,6 +398,13 @@
         return f && f.group === 'material';
       });
     }
+    // The results list is the value moment: once a visitor searches their ZIP (revealed
+    // intent), the count stays visible but the cards blur until the email gate is passed.
+    // National browse (no search) stays open — sharers/browsers see everything.
+    function listLocked() {
+      var captureUrl = (opts.gateDeps.appsScriptUrl != null) ? opts.gateDeps.appsScriptUrl : (cfg.GATE && cfg.GATE.appsScriptUrl);
+      return !!(state.center && captureUrl && gate.shouldGate(true, state.sessionGranted, opts.now(), opts.gateDeps.storage));
+    }
     function renderResults() {
       var list = filtered();
       var within = false, nearest = false;
@@ -409,8 +425,20 @@
       }
       el('ee-results-count').textContent = label;
       var host = el('ee-results-list'); host.innerHTML = '';
+      var locked = listLocked();
+      host.classList.toggle('ee-locked', locked);
+      if (locked && total) {
+        var unlock = document.createElement('button'); unlock.type = 'button'; unlock.className = 'ee-unlock';
+        unlock.textContent = '🔓 Unlock all ' + total + ' location' + (total !== 1 ? 's' : '') + ' near you — free';
+        unlock.addEventListener('click', function () {
+          state.pending = renderResults;
+          showGate();
+        });
+        host.appendChild(unlock);
+      }
       list.slice(0, 100).forEach(function (r) {
         var card = document.createElement('button'); card.type = 'button'; card.className = 'ee-card';
+        if (locked) { card.disabled = true; card.setAttribute('aria-hidden', 'true'); }
         var ee = r.acceptsEE === 'verified' ? '<span class="ee-badge">Accepts EE ✓</span>' : '';
         var dist = (r._d != null) ? '<span class="ee-dist">' + r._d.toFixed(1) + ' mi</span>' : '';
         card.innerHTML = ee + '<h4>' + r.name + '</h4><div class="ee-sub">' +
