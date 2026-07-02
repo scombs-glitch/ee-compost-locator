@@ -559,7 +559,7 @@
     renderChips();
     renderResults();
     var ac = el('ee-attrib-count'); if (ac) ac.textContent = records.length.toLocaleString() + ' facilities mapped';
-    return { refreshData: refreshData, _state: state };
+    return { refreshData: refreshData, _state: state, _map: map };
   }
 
   var api = { init: init };
@@ -600,7 +600,8 @@
       },
       rng: Math.random
     };
-    EE.mapview.init({
+    // Handle kept on EE for console debugging (EE._app._map) and future integrations.
+    EE._app = EE.mapview.init({
       root: document.getElementById('ee-locator-wrapper'),
       data: root.LOCATION_DATA || [],
       cfg: EE.config, filters: EE.filters, gate: EE.gate,
