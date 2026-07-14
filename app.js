@@ -268,7 +268,9 @@
       var st = document.createElement('style');
       st.textContent =
         '#ee-locator-wrapper .ee-results-list.ee-locked .ee-card{filter:blur(5px);pointer-events:none;user-select:none}' +
-        '#ee-locator-wrapper .ee-unlock{display:block;width:calc(100% - 20px);margin:10px;border:0;background:#006837;color:#fff;border-radius:8px;padding:12px;font-weight:700;font-size:14px;cursor:pointer}';
+        '#ee-locator-wrapper .ee-unlock{display:block;width:calc(100% - 20px);margin:10px;border:0;background:#006837;color:#fff;border-radius:8px;padding:12px;font-weight:700;font-size:14px;cursor:pointer}' +
+        // keep zoom buttons above the mobile bottom sheet (peek height 24%)
+        '@media (max-width:768px){#ee-locator-wrapper .maplibregl-ctrl-bottom-left{bottom:26%}}';
       document.head.appendChild(st);
     } catch (e) { /* styling only — never block boot */ }
     var records = opts.data.slice();
@@ -284,8 +286,14 @@
         container: 'ee-map', style: cfg.MAP.baseStyleUrl,
         center: cfg.MAP.initialCenter, zoom: cfg.MAP.initialZoom,
         minZoom: cfg.MAP.minZoom,
-        cooperativeGestures: cfg.MAP.cooperativeGestures
+        cooperativeGestures: cfg.MAP.cooperativeGestures,
+        attributionControl: false
       });
+      // +/- buttons: cluster/double-click zooms IN, but the only way back out was
+      // Cmd+scroll (cooperative gestures) — undiscoverable. Bottom-left: top-right is
+      // the results panel. Attribution moves there too (the panel was covering it).
+      map.addControl(new ML.AttributionControl({ compact: true }), 'bottom-left');
+      map.addControl(new ML.NavigationControl({ showCompass: false }), 'bottom-left');
     } catch (e) {
       // Map/WebGL unavailable in this environment — list, filters, search and gate still work.
       if (window.console) console.warn('EE locator: map unavailable, continuing without it —', e && e.message);
