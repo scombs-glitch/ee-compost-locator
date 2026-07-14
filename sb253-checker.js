@@ -41,6 +41,12 @@
   }
 
   // ---- verdict copy -------------------------------------------------------
+  function verdictHeadline() {
+    if (state.ca === 'no') return 'You are not directly covered today.';
+    if (state.rev === 'lt500') return 'You are not directly covered today.';
+    if (state.rev === '500to1b') return 'SB 261 applies to you (currently paused by the courts).';
+    return 'Both laws apply to you.';
+  }
   function verdictHtml() {
     var h = '';
     var supplier = '<p><strong>Either way, Scope 3 flows downhill.</strong> Companies covered by ' +
@@ -150,13 +156,35 @@
   }
   function go() {
     if (granted()) { showVerdict(); return; }
+    // tease the verdict headline free; the email unlocks the full snapshot
+    var t = $('eesb-tease');
+    if (!t) {
+      t = document.createElement('p');
+      t.id = 'eesb-tease'; t.className = 'eesb-tease';
+      $('eesb-gate').insertBefore(t, $('eesb-gate').firstChild);
+    }
+    t.innerHTML = 'Based on your answers: <strong>' + verdictHeadline() + '</strong> ' +
+      'Unlock the full snapshot for the deadlines, penalties, and next moves.';
     $('eesb-gate').style.display = 'block';
     $('eesb-verdict').style.display = 'none';
     var n = $('eesb-name'); if (n) n.focus();
   }
 
+  function countdown() {
+    var card = document.querySelector('#eesb .eesb-card');
+    if (!card) return;
+    var days = Math.ceil((new Date(2026, 7, 10).getTime() - Date.now()) / 86400000);
+    var p = document.createElement('p');
+    p.className = 'eesb-count';
+    p.textContent = (days > 0)
+      ? 'First SB 253 reports are due August 10, 2026 — ' + days + ' day' + (days !== 1 ? 's' : '') + ' away.'
+      : 'The first SB 253 reports were due August 10, 2026 — Scope 3 reporting is next (2027).';
+    card.insertBefore(p, card.firstChild);
+  }
+
   function start() {
     if (!$('eesb-go')) return;
+    countdown();
     wireChips('rev', 'rev');
     wireChips('ca', 'ca');
     wireChips('persona', 'persona');
