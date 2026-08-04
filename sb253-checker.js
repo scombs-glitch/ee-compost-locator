@@ -74,8 +74,12 @@
         'threshold if you are growing.</p>' + supplier;
     } else {
       h += '<h4>Both laws apply to you</h4>' +
-        '<p><strong>SB 253</strong> (in force): annual greenhouse-gas disclosure. Scope 1 &amp; 2 ' +
-        'reports are due <strong>August 10, 2026</strong> under CARB’s initial regulation, and ' +
+        '<p><strong>SB 253</strong> (in force): annual greenhouse-gas disclosure. CARB has moved ' +
+        'the first Scope 1 &amp; 2 deadline from Aug 10 to <strong>November 10, 2026</strong>. ' +
+        'That date is not yet locked: CARB withdrew its initial regulation from the Office of ' +
+        'Administrative Law on June 24, 2026, and the modified version carrying the new deadline ' +
+        'is out for public comment through <strong>August 11, 2026</strong> before it goes back ' +
+        'for approval. Plan to Nov 10, but watch for the final rule. ' +
         '<strong>Scope 3 reporting begins in 2027</strong> on FY2026 data. Penalties up to $500k/yr.</p>' +
         '<p><strong>SB 261</strong>: biennial climate-risk report — currently ' +
         '<strong>paused by a Ninth Circuit injunction</strong> with CARB treating reporting as ' +
@@ -86,8 +90,9 @@
         'can actually file.</p>';
     }
     h += '<p class="eesb-fine">Educational summary, not legal advice — confirm your ' +
-      'obligations with counsel. Status as of July 14, 2026; the Ninth Circuit appeal ' +
-      '(argued Jan 9, 2026) can change SB 261’s status at any time.</p>' +
+      'obligations with counsel. Status as of August 4, 2026; the Ninth Circuit appeal ' +
+      '(argued Jan 9, 2026) can change SB 261’s status at any time, and CARB’s SB 253 ' +
+      'reporting regulation is not yet final.</p>' +
       '<p><a class="eesb-cta" href="https://emeraldecovations.com/contact-us">Talk to Emerald Ecovations about reportable Scope 3 wins</a></p>';
     return h;
   }
@@ -173,12 +178,14 @@
   function countdown() {
     var card = document.querySelector('#eesb .eesb-card');
     if (!card) return;
-    var days = Math.ceil((new Date(2026, 7, 10).getTime() - Date.now()) / 86400000);
+    // CARB deferred the first Scope 1/2 deadline Aug 10 -> Nov 10, 2026 (announced Jun 24,
+    // 2026). Month is 0-indexed: 10 = November.
+    var days = Math.ceil((new Date(2026, 10, 10).getTime() - Date.now()) / 86400000);
     var p = document.createElement('p');
     p.className = 'eesb-count';
     p.textContent = (days > 0)
-      ? 'First SB 253 reports are due August 10, 2026 — ' + days + ' day' + (days !== 1 ? 's' : '') + ' away.'
-      : 'The first SB 253 reports were due August 10, 2026 — Scope 3 reporting is next (2027).';
+      ? 'First SB 253 reports are due November 10, 2026 — ' + days + ' day' + (days !== 1 ? 's' : '') + ' away.'
+      : 'The first SB 253 reports were due November 10, 2026 — Scope 3 reporting is next (2027).';
     card.insertBefore(p, card.firstChild);
   }
 
