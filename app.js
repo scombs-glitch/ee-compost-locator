@@ -269,6 +269,8 @@
       st.textContent =
         '#ee-locator-wrapper .ee-results-list.ee-locked .ee-card{filter:blur(5px);pointer-events:none;user-select:none}' +
         '#ee-locator-wrapper .ee-unlock{display:block;width:calc(100% - 20px);margin:10px;border:0;background:#006837;color:#fff;border-radius:8px;padding:12px;font-weight:700;font-size:14px;cursor:pointer}' +
+        '#ee-locator-wrapper .ee-report{margin:8px 0 0;font-size:11px}' +
+        '#ee-locator-wrapper .ee-report a{color:#767676;text-decoration:underline}' +
         // keep zoom buttons above the mobile bottom sheet (peek height 24%)
         '@media (max-width:768px){#ee-locator-wrapper .maplibregl-ctrl-bottom-left{bottom:26%}}';
       document.head.appendChild(st);
@@ -495,7 +497,13 @@
         '<p class="ee-sub">' + placeLabel(cfg, r.type) + mats + '</p>' +
         staLink +
         '<p class="ee-note">Type &amp; materials are derived from public records and may be out of date — confirm acceptance directly with the facility.</p>' +
-        '<button id="ee-detail-close" type="button">Close</button>';
+        '<button id="ee-detail-close" type="button">Close</button>' +
+        // crowdsourced corrections: every user is an auditor; reports feed corrections.json
+        '<p class="ee-report"><a href="mailto:marketing@emeraldecovations.com?' +
+        'subject=' + encodeURIComponent('Compost locator correction: ' + r.name + ' (' + r.id + ')') +
+        '&body=' + encodeURIComponent('Facility: ' + r.name + ', ' + [r.city, r.state].filter(Boolean).join(', ') +
+          '\nWhat is wrong (closed / does not take food waste / wrong info)?\n\n') +
+        '">Spot an error? Report this listing</a></p>';
       box.classList.remove('ee-hidden');
       el('ee-detail-close').addEventListener('click', function () { box.classList.add('ee-hidden'); });
     }
